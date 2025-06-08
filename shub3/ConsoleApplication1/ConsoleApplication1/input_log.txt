@@ -1,0 +1,12 @@
+[2025-06-05 17:24:04] Keyboard DOWN - MakeCode: 32 VKey: 68
+[2025-06-05 17:24:04] Keyboard UP - MakeCode: 32 VKey: 68
+[2025-06-05 17:24:05] Keyboard DOWN - MakeCode: 14 VKey: 8
+[2025-06-05 17:24:05] Keyboard UP - MakeCode: 14 VKey: 8
+[2025-06-05 17:24:27] Keyboard UP - MakeCode: 91 VKey: 91
+[2025-06-05 17:24:29] Keyboard DOWN - MakeCode: 91 VKey: 91
+[2025-06-05 17:24:29] Keyboard UP - MakeCode: 91 VKey: 91
+[2025-06-05 17:24:39] Keyboard UP - MakeCode: 44 VKey: 90
+[2025-06-05 17:24:39] Keyboard UP - MakeCode: 56 VKey: 18
+[2025-06-05 17:24:40] Keyboard DOWN - MakeCode: 56 VKey: 18
+[2025-06-05 17:24:40] Keyboard UP - MakeCode: 56 VKey: 18
+[2025-06-05 17:24:40] Keyboard UP - MakeCode: 44 VKey: 90
