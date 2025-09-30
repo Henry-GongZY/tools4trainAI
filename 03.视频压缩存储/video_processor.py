@@ -58,7 +58,14 @@ class VideoProcessor:
                 str(video_path)
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            # Windows 下默认控制台编码可能为 GBK，强制按 UTF-8 解码 ffprobe 的 JSON 输出，避免 UnicodeDecodeError
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                check=True,
+                encoding='utf-8',
+                errors='replace'
+            )
             import json
             data = json.loads(result.stdout)
             
@@ -109,8 +116,11 @@ class VideoProcessor:
                 'ffmpeg',
                 '-y',
                 '-i', str(input_path),
+                '-fflags', '+genpts',
+                '-vsync', '1',
+                '-avoid_negative_ts', 'make_zero',
                 '-c:v', 'libx265',
-                '-preset', 'fast',
+                '-preset', 'slow',
                 '-b:v', '45M',
                 '-minrate', '40M',
                 '-maxrate', '70M',
