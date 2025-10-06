@@ -112,23 +112,40 @@ class VideoProcessor:
         start_time = time.time()
         
         try:
+            # cmd = [
+            #     'ffmpeg',
+            #     '-y',
+            #     '-i', str(input_path),
+            #     '-fflags', '+genpts',
+            #     '-vsync', '1',
+            #     '-avoid_negative_ts', 'make_zero',
+            #     '-c:v', 'libx265',
+            #     '-preset', 'slow',
+            #     '-b:v', '45M',
+            #     '-minrate', '40M',
+            #     '-maxrate', '70M',
+            #     '-bufsize', '420M',
+            #     '-x265-params', 'no-opencl=1',
+            #     '-c:a', 'copy',
+            #     str(output_path)
+            # ]
             cmd = [
                 'ffmpeg',
                 '-y',
                 '-i', str(input_path),
-                '-fflags', '+genpts',
-                '-vsync', '1',
-                '-avoid_negative_ts', 'make_zero',
-                '-c:v', 'libx265',
-                '-preset', 'slow',
+                '-c:v', 'hevc_nvenc',
+                '-rc', 'vbr_hq',
+                '-cq', '15',
                 '-b:v', '45M',
-                '-minrate', '40M',
                 '-maxrate', '70M',
-                '-bufsize', '420M',
-                '-x265-params', 'no-opencl=1',
+                '-bufsize', '450M',
+                '-preset', 'p7',
+                '-profile:v', 'main10',
+                '-pix_fmt', 'p010le',
                 '-c:a', 'copy',
                 str(output_path)
             ]
+
             self.logger.info(f"开始压缩视频: {input_path}")
             subprocess.run(cmd, check=True)
             
