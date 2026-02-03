@@ -13,6 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 import logging
+import datetime
 
 class VideoProcessor:
     def __init__(self, source_dir, cache_dir, target_dir):
@@ -23,8 +24,9 @@ class VideoProcessor:
         # 创建必要的目录（不自动创建缓存目录）
         self.target_dir.mkdir(parents=True, exist_ok=True)
         
-        # 设置日志
-        log_file = Path(__file__).parent / 'video_processing.log'
+        # 设置日志，文件名包含运行时间
+        now_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_file = Path(__file__).parent / f'video_processing_{now_str}.log'
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
