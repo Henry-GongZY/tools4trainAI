@@ -24,9 +24,10 @@ except ImportError:
     sys.exit(1)
 
 
-# --- 预定义手柄映射表 ---
-# 注意：不同平台（Win/Mac/Linux）的 ID 可能略有差异，这里以 macOS/通用 SDL2 为主
-CONTROLLER_MAPPINGS = {
+# --- 平台预定义手柄映射表 ---
+# 由于手中无PS4/PS5手柄，不保证相关手柄内容对应正确
+# TODO: 完善验证PS4/PS5手柄映射规则
+CONTROLLER_MAPPINGS_MACOS = {
     "Xbox": {
         "buttons": {0: "A", 1: "B", 2: "X", 3: "Y", 4: "View", 5: "Xbox", 6: "Menu", 9: "LB", 10: "RB", 11: "D_Up", 12: "D_Down", 13: "D_Left", 14: "D_Right"},
         "axes": {0: "L_Stick_X", 1: "L_Stick_Y", 2: "R_Stick_X", 3: "R_Stick_Y", 4: "L_Trigger", 5: "R_Trigger"}
@@ -41,8 +42,30 @@ CONTROLLER_MAPPINGS = {
     }
 }
 
+CONTROLLER_MAPPINGS_WINDOWS = {
+    "Xbox": {
+        "buttons": {0: "A", 1: "B", 2: "X", 3: "Y", 4: "LB", 5: "RB", 6: "View", 7: "Menu", 10: "Xbox", 11: "D_Up", 12: "D_Down", 13: "D_Left", 14: "D_Right"},
+        "axes": {0: "L_Stick_X", 1: "L_Stick_Y", 2: "R_Stick_X", 3: "R_Stick_Y", 4: "L_Trigger", 5: "R_Trigger"}
+    },
+    "DualSense": { # PS5
+        "buttons": {0: "Cross", 1: "Circle", 2: "Square", 3: "Triangle", 4: "Share", 5: "PS", 6: "Options", 7: "L3", 8: "R3", 9: "L1", 10: "R1", 11: "Up", 12: "Down", 13: "Left", 14: "Right", 15: "Touchpad"},
+        "axes": {0: "L_Stick_X", 1: "L_Stick_Y", 2: "R_Stick_X", 3: "R_Stick_Y", 4: "L2", 5: "R2"}
+    },
+    "PS4": {
+        "buttons": {0: "Cross", 1: "Circle", 2: "Square", 3: "Triangle", 4: "Share", 5: "PS", 6: "Options", 7: "L3", 8: "R3", 9: "L1", 10: "R1"},
+        "axes": {0: "L_Stick_X", 1: "L_Stick_Y", 2: "R_Stick_X", 3: "R_Stick_Y", 4: "L2", 5: "R2"}
+    }
+}
 
 def get_mapping(joy_name):
+    CONTROLLER_MAPPINGS = None
+    if sys.platform == "darwin":
+        CONTROLLER_MAPPINGS = CONTROLLER_MAPPINGS_MACOS
+    elif sys.platform == "win32":
+        CONTROLLER_MAPPINGS = CONTROLLER_MAPPINGS_WINDOWS
+    else:
+        raise NotImplementedError("linux平台手柄捕捉逻辑暂未实现，error")
+
     """根据名称模糊匹配映射表"""
     for key in CONTROLLER_MAPPINGS:
         if key.lower() in joy_name.lower():
@@ -69,7 +92,7 @@ class GamepadRecorder:
         self.joysticks = {}        # 存储已初始化的手柄实例
         self.mappings = {}         # 存储每个手柄对应的映射表
         self.last_axes = {}        # 存储上一次的轴数值
-        self.last_hats = {}        # 存储上一次的方向键状态
+        self.last_hats = {}        # 存储上一次的方向键状态 (按 joy_id 索引)
 
     def _write_line(self, line: str) -> None:
         try:
@@ -141,7 +164,7 @@ class GamepadRecorder:
                 self.mappings[i] = mapping
                 
                 self.last_axes[i] = [0.0] * joy.get_numaxes()
-                self.last_hats[i] = [(0, 0)] * joy.get_numhats()
+                self.last_hats[i] = (0, 0)
                 
                 status = f"Mapped as {name}" if mapping else "No specific mapping found"
                 self._log("INFO", f"Initialized [ID={i}] {name} ({status})")
@@ -181,7 +204,26 @@ class GamepadRecorder:
                         btn_label = mapping['buttons'].get(event.button, event.button) if mapping else event.button
                         self._log("BUTTON_UP", f"id={event.joy} key={btn_label}")
                     elif event.type == pygame.JOYHATMOTION:
-                        self._log("HAT_MOVE", f"id={event.joy} hat={event.hat} val={event.value}")
+                        joy_id = event.joy
+                        curr_x, curr_y = event.value
+                        prev_x, prev_y = self.last_hats.get(joy_id, (0, 0))
+
+                        # 定义四个方向的当前状态与之前的状态
+                        checks = [
+                            ("D_Up",    curr_y == 1,  prev_y == 1),
+                            ("D_Down",  curr_y == -1, prev_y == -1),
+                            ("D_Left",  curr_x == -1, prev_x == -1),
+                            ("D_Right", curr_x == 1,  prev_x == 1),
+                        ]
+
+                        for label, is_active, was_active in checks:
+                            if is_active and not was_active:
+                                self._log("BUTTON_DOWN", f"id={joy_id} key={label}")
+                            elif was_active and not is_active:
+                                self._log("BUTTON_UP", f"id={joy_id} key={label}")
+
+                        self.last_hats[joy_id] = event.value
+
                     elif event.type == pygame.JOYDEVICEADDED:
                         print(f"\n[检测到新设备插入]")
                         self.init_joysticks()
