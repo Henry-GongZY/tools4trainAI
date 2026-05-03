@@ -24,6 +24,32 @@ except ImportError:
     sys.exit(1)
 
 
+# --- 预定义手柄映射表 ---
+# 注意：不同平台（Win/Mac/Linux）的 ID 可能略有差异，这里以 macOS/通用 SDL2 为主
+CONTROLLER_MAPPINGS = {
+    "Xbox": {
+        "buttons": {0: "A", 1: "B", 2: "X", 3: "Y", 4: "View", 5: "Xbox", 6: "Menu", 9: "LB", 10: "RB", 11: "D_Up", 12: "D_Down", 13: "D_Left", 14: "D_Right"},
+        "axes": {0: "L_Stick_X", 1: "L_Stick_Y", 2: "R_Stick_X", 3: "R_Stick_Y", 4: "L_Trigger", 5: "R_Trigger"}
+    },
+    "DualSense": { # PS5
+        "buttons": {0: "Cross", 1: "Circle", 2: "Square", 3: "Triangle", 4: "Share", 5: "PS", 6: "Options", 7: "L3", 8: "R3", 9: "L1", 10: "R1", 11: "Up", 12: "Down", 13: "Left", 14: "Right", 15: "Touchpad"},
+        "axes": {0: "L_Stick_X", 1: "L_Stick_Y", 2: "R_Stick_X", 3: "R_Stick_Y", 4: "L2", 5: "R2"}
+    },
+    "PS4": {
+        "buttons": {0: "Cross", 1: "Circle", 2: "Square", 3: "Triangle", 4: "Share", 5: "PS", 6: "Options", 7: "L3", 8: "R3", 9: "L1", 10: "R1"},
+        "axes": {0: "L_Stick_X", 1: "L_Stick_Y", 2: "R_Stick_X", 3: "R_Stick_Y", 4: "L2", 5: "R2"}
+    }
+}
+
+
+def get_mapping(joy_name):
+    """根据名称模糊匹配映射表"""
+    for key in CONTROLLER_MAPPINGS:
+        if key.lower() in joy_name.lower():
+            return CONTROLLER_MAPPINGS[key]
+    return None
+
+
 def now_iso() -> str:
     return datetime.now().isoformat()
 
@@ -41,6 +67,7 @@ class GamepadRecorder:
         
         self.running = False
         self.joysticks = {}        # 存储已初始化的手柄实例
+        self.mappings = {}         # 存储每个手柄对应的映射表
         self.last_axes = {}        # 存储上一次的轴数值
         self.last_hats = {}        # 存储上一次的方向键状态
 
@@ -62,10 +89,9 @@ class GamepadRecorder:
         if not pygame.joystick.get_init():
             pygame.joystick.init()
         
-        # macOS 兼容性：强制刷新事件队列，给系统响应时间
+        # 强制刷新事件队列，给系统响应时间
         pygame.event.pump()
         time.sleep(0.1)
-        pygame.event.pump()
 
         count = pygame.joystick.get_count()
         
@@ -83,10 +109,21 @@ class GamepadRecorder:
         if count == 0:
             print("\n" + "="*40)
             print("错误: 未检测到任何手柄。")
-            print("如果您使用的是 macOS，请检查以下设置：")
-            print("1. [系统设置] -> [隐私与安全性] -> [输入监听]")
-            print("2. 确保您当前的终端 (Terminal/VSCode) 已勾选并开启")
-            print("3. 如果已经开启，请尝试彻底重启终端应用")
+            if sys.platform == "win32":
+                print("当前系统为 Windows，请检查以下设置：")
+                print("1. 确保手柄已正确连接到电脑")
+                print("2. 确保手柄驱动已正确安装")
+                print("3. 如果已经开启，请尝试彻底重启终端应用")
+            elif sys.platform == "linux":
+                print("当前系统为 Linux，请检查以下设置：")
+                print("1. 确保手柄已正确连接到电脑")
+                print("2. 确保手柄驱动已正确安装")
+                print("3. 如果已经开启，请尝试彻底重启终端应用")
+            if sys.platform == "darwin":
+                print("当前系统为 macOS，请检查以下设置：")
+                print("1. [系统设置] -> [隐私与安全性] -> [输入监听]")
+                print("2. 确保您当前的终端 (Terminal/VSCode) 已勾选并开启")
+                print("3. 如果已经开启，请尝试彻底重启终端应用")
             print("="*40)
             return False
         
@@ -98,9 +135,16 @@ class GamepadRecorder:
                 name = joy.get_name()
                 guid = joy.get_guid()
                 self.joysticks[i] = joy
+                
+                # 识别型号并获取映射
+                mapping = get_mapping(name)
+                self.mappings[i] = mapping
+                
                 self.last_axes[i] = [0.0] * joy.get_numaxes()
                 self.last_hats[i] = [(0, 0)] * joy.get_numhats()
-                self._log("INFO", f"Initialized [ID={i}] Name={name}")
+                
+                status = f"Mapped as {name}" if mapping else "No specific mapping found"
+                self._log("INFO", f"Initialized [ID={i}] {name} ({status})")
             except Exception as e:
                 print(f"初始化手柄 {i} 失败: {e}")
         
@@ -126,10 +170,16 @@ class GamepadRecorder:
                 
                 # 处理所有待处理事件
                 for event in pygame.event.get():
+                    # 获取当前手柄的映射表
+                    joy_id = getattr(event, 'joy', None)
+                    mapping = self.mappings.get(joy_id) if joy_id is not None else None
+                    
                     if event.type == pygame.JOYBUTTONDOWN:
-                        self._log("BUTTON_DOWN", f"id={event.joy} btn={event.button}")
+                        btn_label = mapping['buttons'].get(event.button, event.button) if mapping else event.button
+                        self._log("BUTTON_DOWN", f"id={event.joy} key={btn_label}")
                     elif event.type == pygame.JOYBUTTONUP:
-                        self._log("BUTTON_UP", f"id={event.joy} btn={event.button}")
+                        btn_label = mapping['buttons'].get(event.button, event.button) if mapping else event.button
+                        self._log("BUTTON_UP", f"id={event.joy} key={btn_label}")
                     elif event.type == pygame.JOYHATMOTION:
                         self._log("HAT_MOVE", f"id={event.joy} hat={event.hat} val={event.value}")
                     elif event.type == pygame.JOYDEVICEADDED:
@@ -141,7 +191,7 @@ class GamepadRecorder:
 
                 # 处理轴 (Axes) - 通过轮询获取连续值
                 for joy_id, joy in self.joysticks.items():
-                    # 注意：如果设备中途断开，joy 可能会失效，init_joysticks 会重新构建列表
+                    mapping = self.mappings.get(joy_id)
                     try:
                         for a in range(joy.get_numaxes()):
                             val = joy.get_axis(a)
@@ -153,7 +203,8 @@ class GamepadRecorder:
                             # 变化率过滤
                             last_val = self.last_axes[joy_id][a]
                             if abs(val - last_val) > self.min_delta:
-                                self._log("AXIS_MOVE", f"id={joy_id} axis={a} val={val:.4f}")
+                                axis_label = mapping['axes'].get(a, a) if mapping else a
+                                self._log("AXIS_MOVE", f"id={joy_id} axis={axis_label} val={val:.4f}")
                                 self.last_axes[joy_id][a] = val
                     except:
                         continue
