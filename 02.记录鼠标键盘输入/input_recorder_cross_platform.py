@@ -138,6 +138,12 @@ class InputRecorder:
         action = "PRESS" if pressed else "RELEASE"
         self._log("M", action, f"button={btn_name}")
 
+    def on_mouse_scroll(self, x: int, y: int, dx: int, dy: int):
+        # 记录滚轮事件
+        # dy > 0: 向上滚动, dy < 0: 向下滚动
+        # dx > 0: 向右滚动, dx < 0: 向左滚动
+        self._log("M", "SCROLL", f"x={x} y={y} dx={dx} dy={dy}")
+
     @staticmethod
     def _button_to_lrm(button) -> str | None:
         if button == pynput_mouse.Button.left:
@@ -161,6 +167,7 @@ class InputRecorder:
         self.mouse_listener = pynput_mouse.Listener(
             on_click=self.on_mouse_click,
             on_move=self.on_mouse_move,
+            on_scroll=self.on_mouse_scroll,
         )
 
         self.keyboard_listener.start()
